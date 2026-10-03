@@ -16,24 +16,19 @@ A lightweight, zero-cost lead intelligence CLI and waterfall enrichment engine. 
 
 No external dependencies required. Runs on Python 3.8+ standard library:
 
-```bash
-git clone [https://github.com/YOUR_USERNAME/coldengine-os.git](https://github.com/YOUR_USERNAME/coldengine-os.git)
-cd coldengine-os
-python enricher.py
-from enricher import ColdEngine
+> **git clone [https://github.com/coldengine-os.git](https://github.com/coldengine-os.git)**  
+> **cd coldengine-os**  
+> **python enricher.py**  
 
-engine = ColdEngine("stripe.com")
-lead_intel = engine.compile_prompt_payload("John", "Doe", "VP Sales")
-print(lead_intel)
-🏢 Upgrade to ColdEngine OS - Agency Pro
+---
+
+## 🏢 Upgrade to ColdEngine OS - Agency Pro
+
 Need the full production pipeline ready to plug into Smartlead, Instantly, or your CRM?
 
-The Agency Pro Package includes:
+**The Agency Pro Package includes:**
+- **Turnkey n8n Waterfall Workflow (.json):** One-click import for automated webhook ingestion, Google DNS verification, and dynamic LLM personalization.
+- **5 High-Conversion Copy Sequences:** Battle-tested cold outreach templates.
+- **Commercial Agency License:** Unlimited client accounts, zero per-seat SaaS markups.
 
-Turnkey n8n Waterfall Workflow (.json): One-click import for automated webhook ingestion, Google DNS verification, and dynamic LLM personalization.
-
-5 High-Conversion Copy Sequences: Battle-tested cold outreach templates.
-
-Commercial Agency License: Unlimited client accounts, zero per-seat SaaS markups.
-
-👉 Get ColdEngine OS Agency Pro License (₹11,999 / $149)
+👉 [Get ColdEngine OS Agency Pro License (₹11,999 / $149)](https://rzp.io/rzp/coldengine-os)
