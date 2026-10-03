@@ -30,5 +30,23 @@ Need the full production pipeline ready to plug into Smartlead, Instantly, or yo
 - **Turnkey n8n Waterfall Workflow (.json):** One-click import for automated webhook ingestion, Google DNS verification, and dynamic LLM personalization.
 - **5 High-Conversion Copy Sequences:** Battle-tested cold outreach templates.
 - **Commercial Agency License:** Unlimited client accounts, zero per-seat SaaS markups.
+---
+
+## ⚡ Free CLI vs. Agency Production Bundle
+
+| Feature | Open-Source CLI (Free) | Agency Production Bundle (₹11,999) |
+| :--- | :---: | :---: |
+| **DNS-over-HTTPS MX Validation** | ✅ Included | ✅ Included |
+| **Homepage Metadata Scraper** | ✅ Basic CLI | ✅ Fully Integrated |
+| **Local Python Script (`enricher.py`)** | ✅ Included | ✅ Included |
+| **Complete Turnkey n8n Waterfall JSON** | ❌ (Build yourself) | ✅ **Production Canvas (Import & Run)** |
+| **Automated Rate-Limiting & Retries** | ❌ (Basic error try/catch) | ✅ **Pre-built Exponential Backoff** |
+| **5x Battle-Tested Cold Outreach Templates**| ❌ | ✅ **Included (High-Reply Copy Frameworks)** |
+| **Webhook / Web-App Ready Integration** | ❌ | ✅ **Plug-and-Play JSON Endpoints** |
+
+---
+
+### 🚀 Get the Turnkey Agency Bundle
+Skip 15+ hours of node configuration, debugging rate limits, and wiring webhooks. 
 
 👉 [Get ColdEngine OS Agency Pro License (₹11,999 / $149)](https://rzp.io/rzp/coldengine-os)
