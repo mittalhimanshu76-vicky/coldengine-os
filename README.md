@@ -16,7 +16,7 @@ A lightweight, zero-cost lead intelligence CLI and waterfall enrichment engine. 
 
 No external dependencies required. Runs on Python 3.8+ standard library:
 
-> **git clone [https://github.com/coldengine-os.git](https://github.com/coldengine-os.git)**  
+> **git clone https://github.com/mittalhimanshu76-vicky/coldengine-os.git**  
 > **cd coldengine-os**  
 > **python enricher.py**  
 
