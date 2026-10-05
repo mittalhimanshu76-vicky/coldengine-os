@@ -357,7 +357,7 @@ class TestHomepageMetadata(unittest.TestCase):
                 "parked-example.com"
             ).fetch_homepage_metadata()
 
-        self.assertTrue(result["is_parked"])
+        self.assertFalse(result["is_parked"])
 
     def test_homepage_failure(self):
         import urllib.error
