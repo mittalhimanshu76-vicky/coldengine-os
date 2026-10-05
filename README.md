@@ -2,25 +2,25 @@
 
 Lightweight, open-source B2B lead pre-flight verification and metadata enrichment engine for outbound teams. 
 
-Run pre-enrichment checks locally using pure Python (zero external dependencies) or import the visual waterfall into self-hosted n8n to eliminate paid credit waste on dead or parked domains[span_4](start_span)[span_4](end_span)[span_5](start_span)[span_5](end_span).
+Run pre-enrichment checks locally using pure Python (zero external dependencies) or import the visual waterfall into self-hosted n8n to eliminate paid credit waste on dead or parked domains.
 
 ---
 
 ## The Problem: Credit Burn on Dead Leads
 
-Running raw, uncleaned lead lists directly through credit-based enrichment tools burns paid credits on domains that do not even have active mail servers[span_6](start_span)[span_6](end_span). Between 15% and 30% of scraped domains are dead, expired, or parked.
+Running raw, uncleaned lead lists directly through credit-based enrichment tools burns paid credits on domains that do not even have active mail servers. Between 15% and 30% of scraped domains are dead, expired, or parked.
 
-ColdEngine OS acts as a **zero-cost pre-flight filter** before leads hit downstream catch-all verifiers, search APIs, or sending platforms[span_7](start_span)[span_7](end_span)[span_8](start_span)[span_8](end_span).
+ColdEngine OS acts as a **zero-cost pre-flight filter** before leads hit downstream catch-all verifiers, search APIs, or sending platforms.
 
 ---
 
 ## What ColdEngine OS Does
 
-1. **DNS-over-HTTPS (DoH) MX Validation (Port 443):** Queries Google's public DoH resolver to confirm active Mail Exchangers[span_9](start_span)[span_9](end_span)[span_10](start_span)[span_10](end_span). It never initiates port 25 handshakes, avoiding IP blacklists and ISP blocks[span_11](start_span)[span_11](end_span).
-2. **Sub-300ms Root Metadata Extraction:** Uses the pure Python standard library to parse `<title>` and `<meta name="description">` tags without running headless browser binaries[span_12](start_span)[span_12](end_span)[span_13](start_span)[span_13](end_span).
-3. **Parked Domain Filtering:** Flags domain parking pages (GoDaddy, Sedo, Dan) before spending downstream resources[span_14](start_span)[span_14](end_span).
+1. **DNS-over-HTTPS (DoH) MX Validation (Port 443):** Queries Google's public DoH resolver to confirm active Mail Exchangers. It never initiates port 25 handshakes, avoiding IP blacklists and ISP blocks.
+2. **Sub-300ms Root Metadata Extraction:** Uses the pure Python standard library to parse `<title>` and `<meta name="description">` tags without running headless browser binaries.
+3. **Parked Domain Filtering:** Flags domain parking pages (GoDaddy, Sedo, Dan) before spending downstream resources.
 4. **Email Permutation Generation:** Generates deterministic address patterns (`first@`, `first.last@`, `flast@`) ready for downstream catch-all checking.
-5. **Structured LLM Prompt Payload:** Compiles clean company metadata into a minimal payload ready for `gpt-4o-mini`, cutting token consumption to ~$2 per 1,000 leads[span_15](start_span)[span_15](end_span)[span_16](start_span)[span_16](end_span).
+5. **Structured LLM Prompt Payload:** Compiles clean company metadata into a minimal payload ready for `gpt-4o-mini`, cutting token consumption to ~$2 per 1,000 leads.
 
 ---
 
