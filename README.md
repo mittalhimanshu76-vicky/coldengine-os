@@ -1,52 +1,37 @@
-# ColdEngine OS: Open-Source Lead Intelligence & Clay Alternative
+# ColdEngine OS
 
-A lightweight, zero-cost lead intelligence CLI and waterfall enrichment engine. Eliminate $349/month SaaS subscriptions (Clay, Apollo, ZoomInfo) by running enrichment self-hosted.
+Lightweight, open-source B2B lead pre-flight verification and metadata enrichment engine for outbound teams. 
 
----
-
-## ⚡ What it Does
-- **Native DNS/MX Verification:** Checks mail server resolution directly via Google DNS JSON API ($0 cost).
-- **Metadata Scraping:** Headless extraction of `<title>` and `<meta name="description">` in <250ms.
-- **B2B Permutation Engine:** Formulates standard corporate email variations.
-- **LLM Prompt Payload:** Compiles structured JSON for instant OpenAI/Claude first-line generation.
+Run pre-enrichment checks locally using pure Python (zero external dependencies) or import the visual waterfall into self-hosted n8n to eliminate paid credit waste on dead or parked domains[span_4](start_span)[span_4](end_span)[span_5](start_span)[span_5](end_span).
 
 ---
 
-## 🚀 Quickstart (Python CLI)
+## The Problem: Credit Burn on Dead Leads
 
-No external dependencies required. Runs on Python 3.8+ standard library:
+Running raw, uncleaned lead lists directly through credit-based enrichment tools burns paid credits on domains that do not even have active mail servers[span_6](start_span)[span_6](end_span). Between 15% and 30% of scraped domains are dead, expired, or parked.
 
-> **git clone https://github.com/mittalhimanshu76-vicky/coldengine-os.git**  
-> **cd coldengine-os**  
-> **python enricher.py**  
+ColdEngine OS acts as a **zero-cost pre-flight filter** before leads hit downstream catch-all verifiers, search APIs, or sending platforms[span_7](start_span)[span_7](end_span)[span_8](start_span)[span_8](end_span).
 
 ---
 
-## 🏢 Upgrade to ColdEngine OS - Agency Pro
+## What ColdEngine OS Does
 
-Need the full production pipeline ready to plug into Smartlead, Instantly, or your CRM?
-
-**The Agency Pro Package includes:**
-- **Turnkey n8n Waterfall Workflow (.json):** One-click import for automated webhook ingestion, Google DNS verification, and dynamic LLM personalization.
-- **5 High-Conversion Copy Sequences:** Battle-tested cold outreach templates.
-- **Commercial Agency License:** Unlimited client accounts, zero per-seat SaaS markups.
----
-
-## ⚡ Free CLI vs. Agency Production Bundle
-
-| Feature | Open-Source CLI (Free) | Agency Production Bundle (₹11,999) |
-| :--- | :---: | :---: |
-| **DNS-over-HTTPS MX Validation** | ✅ Included | ✅ Included |
-| **Homepage Metadata Scraper** | ✅ Basic CLI | ✅ Fully Integrated |
-| **Local Python Script (`enricher.py`)** | ✅ Included | ✅ Included |
-| **Complete Turnkey n8n Waterfall JSON** | ❌ (Build yourself) | ✅ **Production Canvas (Import & Run)** |
-| **Automated Rate-Limiting & Retries** | ❌ (Basic error try/catch) | ✅ **Pre-built Exponential Backoff** |
-| **5x Battle-Tested Cold Outreach Templates**| ❌ | ✅ **Included (High-Reply Copy Frameworks)** |
-| **Webhook / Web-App Ready Integration** | ❌ | ✅ **Plug-and-Play JSON Endpoints** |
+1. **DNS-over-HTTPS (DoH) MX Validation (Port 443):** Queries Google's public DoH resolver to confirm active Mail Exchangers[span_9](start_span)[span_9](end_span)[span_10](start_span)[span_10](end_span). It never initiates port 25 handshakes, avoiding IP blacklists and ISP blocks[span_11](start_span)[span_11](end_span).
+2. **Sub-300ms Root Metadata Extraction:** Uses the pure Python standard library to parse `<title>` and `<meta name="description">` tags without running headless browser binaries[span_12](start_span)[span_12](end_span)[span_13](start_span)[span_13](end_span).
+3. **Parked Domain Filtering:** Flags domain parking pages (GoDaddy, Sedo, Dan) before spending downstream resources[span_14](start_span)[span_14](end_span).
+4. **Email Permutation Generation:** Generates deterministic address patterns (`first@`, `first.last@`, `flast@`) ready for downstream catch-all checking.
+5. **Structured LLM Prompt Payload:** Compiles clean company metadata into a minimal payload ready for `gpt-4o-mini`, cutting token consumption to ~$2 per 1,000 leads[span_15](start_span)[span_15](end_span)[span_16](start_span)[span_16](end_span).
 
 ---
 
-### 🚀 Get the Turnkey Agency Bundle
-Skip 15+ hours of node configuration, debugging rate limits, and wiring webhooks. 
+## Quickstart (CLI)
 
-👉 [Get ColdEngine OS Agency Pro License (₹11,999 / $149)](https://rzp.io/rzp/coldengine-os)
+No `pip install` required. Built entirely on the Python 3 standard library.
+
+```bash
+# Clone the repository
+git clone [https://github.com/mittalhimanshu76-vicky/coldengine-os.git](https://github.com/mittalhimanshu76-vicky/coldengine-os.git)
+cd coldengine-os
+
+# Run pre-flight check on a domain
+python3 enricher.py vercel.com --first Guillermo --last Rauch --company Vercel
