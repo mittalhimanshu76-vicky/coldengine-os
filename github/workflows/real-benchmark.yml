@@ -29,42 +29,98 @@ jobs:
           import csv
           from collections import Counter
 
-          with open("benchmarks/results.csv", newline="", encoding="utf-8") as f:
+          with open(
+              "benchmarks/results.csv",
+              newline="",
+              encoding="utf-8"
+          ) as f:
               rows = list(csv.DictReader(f))
 
           total = len(rows)
+
           ready = sum(
               r.get("coldengine_ready", "").lower() == "true"
               for r in rows
           )
+
+          hard_reject = sum(
+              r.get("coldengine_hard_reject", "").lower() == "true"
+              for r in rows
+          )
+
+          needs_review = sum(
+              r.get("coldengine_needs_review", "").lower() == "true"
+              for r in rows
+          )
+
+          parked = sum(
+              r.get("coldengine_is_parked", "").lower() == "true"
+              for r in rows
+          )
+
           retryable = sum(
               r.get("coldengine_retryable", "").lower() == "true"
               for r in rows
           )
-          rejected = total - ready
 
-          print("=" * 50)
-          print("COLDENGINE REAL-DOMAIN BENCHMARK")
-          print("=" * 50)
-          print(f"TOTAL DOMAINS:     {total}")
-          print(f"READY:             {ready}")
-          print(f"REJECTED:          {rejected}")
-          print(f"REJECTION RATE:    {rejected / total * 100:.1f}%")
-          print(f"RETRYABLE:         {retryable}")
+          site_unreachable = sum(
+              r.get("coldengine_site_reachable", "").lower() == "false"
+              and r.get("coldengine_has_mx", "").lower() == "true"
+              for r in rows
+          )
+
+          print("=" * 60)
+          print("COLDENGINE v1.3 REAL-DOMAIN BENCHMARK")
+          print("=" * 60)
+          print(f"TOTAL DOMAINS:       {total}")
+          print(f"READY:               {ready}")
+          print(f"HARD REJECT:         {hard_reject}")
+          print(f"NEEDS REVIEW:        {needs_review}")
+          print(f"PARKED:              {parked}")
+          print(f"SITE UNREACHABLE:    {site_unreachable}")
+          print(f"RETRYABLE DNS:       {retryable}")
+          print()
+
+          if total:
+              print(
+                  f"HARD REJECT RATE:    "
+                  f"{hard_reject / total * 100:.1f}%"
+              )
+
+              print(
+                  f"REVIEW RATE:         "
+                  f"{needs_review / total * 100:.1f}%"
+              )
+
+              print(
+                  f"READY RATE:          "
+                  f"{ready / total * 100:.1f}%"
+              )
+
           print()
           print("STATUS BREAKDOWN:")
-          
+
           for status, count in Counter(
               r.get("coldengine_status", "")
               for r in rows
           ).most_common():
               print(f"  {status}: {count}")
 
-          print("=" * 50)
+          print()
+          print("SITE ERROR BREAKDOWN:")
+
+          for error, count in Counter(
+              r.get("coldengine_site_error", "")
+              for r in rows
+              if r.get("coldengine_site_error", "")
+          ).most_common():
+              print(f"  {error}: {count}")
+
+          print("=" * 60)
           PY
 
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
-          name: coldengine-real-domain-benchmark
+          name: coldengine-v1.3-real-domain-benchmark
           path: benchmarks/results.csv
