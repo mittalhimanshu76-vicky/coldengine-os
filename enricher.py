@@ -381,7 +381,6 @@ class ColdEngine:
             "description": description,
             "is_parked": is_parked,
         }
-
         def generate_email_candidates(self) -> list:
         """
         Generate deterministic email patterns.
