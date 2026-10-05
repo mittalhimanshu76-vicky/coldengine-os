@@ -1,82 +1,163 @@
+#!/usr/bin/env python3
 """
-ColdEngine OS - Standalone Lead Enrichment & Verification Engine
-Version: 1.0 (Agency Pro License)
+ColdEngine OS (v1.1) - Lightweight B2B Lead Intelligence & Pre-Flight Engine
+Pure Python standard library. Zero external dependencies.
 """
 
+import argparse
 import json
 import re
-import socket
 import sys
+import urllib.parse
 import urllib.request
-from typing import Dict, List
+
 
 class ColdEngine:
-    def __init__(self, target_domain: str):
-        self.domain = target_domain.strip().lower().replace("https://", "").replace("http://", "").split("/")[0]
+    def __init__(self, domain: str, first_name: str = "", last_name: str = "", company: str = ""):
+        self.domain = domain.strip().lower()
+        self.first_name = first_name.strip().lower()
+        self.last_name = last_name.strip().lower()
+        self.company = company.strip() or self.domain.split(".")[0].capitalize()
 
-    def verify_mx(self) -> Dict[str, any]:
-        """Validates if domain resolves and accepts incoming traffic."""
+    def check_mx_records(self) -> dict:
+        """
+        Performs genuine MX record lookup using Google DNS-over-HTTPS (DoH).
+        Runs over port 443 without touching port 25 or triggering ISP blocking.
+        """
+        doh_url = f"https://dns.google/resolve?name={urllib.parse.quote(self.domain)}&type=MX"
+        req = urllib.request.Request(
+            doh_url,
+            headers={"User-Agent": "ColdEngine-OS/1.1 (DNS Pre-Flight Check)"}
+        )
         try:
-            socket.gethostbyname(self.domain)
-            return {"domain_resolves": True, "status": "active"}
-        except socket.gaierror:
-            return {"domain_resolves": False, "status": "dead_domain"}
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode("utf-8"))
 
-    def generate_email_patterns(self, first_name: str, last_name: str) -> List[str]:
-        """Generates standard corporate B2B email permutations."""
-        f = re.sub(r'[^a-zA-Z]', '', first_name.lower())
-        l = re.sub(r'[^a-zA-Z]', '', last_name.lower())
-        if not f or not l:
-            return []
-        
-        return [
-            f"{f}@{self.domain}",
-            f"{f}.{l}@{self.domain}",
-            f"{f[0]}{l}@{self.domain}",
-            f"{f}_{l}@{self.domain}",
-            f"{l}.{f}@{self.domain}"
-        ]
+            status = data.get("Status", -1)
+            answers = data.get("Answer", [])
 
-    def scrape_company_signals(self) -> Dict[str, str]:
-        """Extracts title and meta description without paid APIs."""
+            if status == 0 and answers:
+                mx_hosts = [ans.get("data", "").split()[-1].rstrip(".") for ans in answers if "data" in ans]
+                return {
+                    "has_mx": True,
+                    "status": "VALID_MAIL_EXCHANGE",
+                    "mx_records": mx_hosts
+                }
+            return {
+                "has_mx": False,
+                "status": "NO_MX_RECORDS",
+                "mx_records": []
+            }
+        except Exception as e:
+            return {
+                "has_mx": False,
+                "status": f"DNS_QUERY_FAILED: {str(e)}",
+                "mx_records": []
+            }
+
+    def fetch_homepage_metadata(self) -> dict:
+        """
+        Lightweight HTTP metadata scraper (sub-300ms, non-headless).
+        Extracts title, meta description, and parking indicators.
+        """
         url = f"https://{self.domain}"
         req = urllib.request.Request(
-            url, 
-            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ColdEngineBot/1.0'}
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
         )
         try:
-            with urllib.request.urlopen(req, timeout=8) as response:
-                html = response.read().decode('utf-8', errors='ignore')
-                
-                title_match = re.search(r'<title>(.*?)</title>', html, re.IGNORECASE)
-                meta_desc = re.search(r'<meta[^>]*name=["\']description["\'][^>]*content=["\'](.*?)["\']', html, re.IGNORECASE)
-                
-                return {
-                    "company_name": title_match.group(1).strip() if title_match else self.domain,
-                    "description": meta_desc.group(1).strip() if meta_desc else "Description unavailable",
-                    "status": "success"
-                }
-        except Exception as e:
-            return {"company_name": self.domain, "description": "Failed to scrape homepage", "error": str(e)}
+            with urllib.request.urlopen(req, timeout=4) as response:
+                html = response.read().decode("utf-8", errors="ignore")
 
-    def compile_prompt_payload(self, first_name: str, last_name: str, prospect_title: str) -> Dict[str, any]:
-        signals = self.scrape_company_signals()
-        emails = self.generate_email_patterns(first_name, last_name)
+            title_match = re.search(r"<title[^>]*>(.*?)</title>", html, re.IGNORECASE | re.DOTALL)
+            desc_match = re.search(
+                r'<meta\s+[^>]*name=["\']description["\'][^>]*content=["\'](.*?)["\']',
+                html,
+                re.IGNORECASE | re.DOTALL
+            ) or re.search(
+                r'<meta\s+[^>]*content=["\'](.*?)["\'][^>]*name=["\']description["\']',
+                html,
+                re.IGNORECASE | re.DOTALL
+            )
+
+            title = title_match.group(1).strip() if title_match else ""
+            description = desc_match.group(1).strip() if desc_match else ""
+
+            # Detect parked/for-sale domain footprints
+            parking_signals = ["domain for sale", "buy this domain", "parked free", "godaddy", "dan.com", "namecheap"]
+            is_parked = any(sig in (title + " " + description).lower() for sig in parking_signals)
+
+            return {
+                "reachable": True,
+                "title": title,
+                "description": description,
+                "is_parked": is_parked
+            }
+        except Exception:
+            return {
+                "reachable": False,
+                "title": "",
+                "description": "",
+                "is_parked": False
+            }
+
+    def generate_email_permutations(self) -> list:
+        """Generates standard candidate address patterns (unverified)."""
+        if not self.first_name:
+            return []
         
-        llm_prompt = (
-            f"Write a sharp 2-sentence cold outreach opening for {first_name} ({prospect_title} at {signals['company_name']}). "
-            f"Company context: '{signals['description']}'. "
-            f"Focus on streamlining outbound operations without expensive SaaS seats. No flattery or filler."
-        )
+        d = self.domain
+        fn = self.first_name
+        ln = self.last_name
+        
+        candidates = [f"{fn}@{d}"]
+        if ln:
+            candidates.extend([
+                f"{fn}.{ln}@{d}",
+                f"{fn[0]}{ln}@{d}",
+                f"{fn}{ln[0]}@{d}",
+                f"{ln}.{fn}@{d}"
+            ])
+        return candidates
+
+    def run(self) -> dict:
+        mx_result = self.check_mx_records()
+        metadata = self.fetch_homepage_metadata() if mx_result["has_mx"] else {"reachable": False, "title": "", "description": "", "is_parked": False}
+        candidates = self.generate_email_permutations()
+
+        # Build clean LLM prompt payload ready to feed into any inference engine
+        llm_context = {
+            "company": self.company,
+            "title": metadata["title"],
+            "description": metadata["description"]
+        } if metadata["reachable"] and not metadata["is_parked"] else None
 
         return {
-            "prospect": f"{first_name} {last_name}",
             "domain": self.domain,
-            "emails_to_test": emails,
-            "company_intel": signals,
-            "generated_llm_prompt": llm_prompt
+            "company": self.company,
+            "dns_preflight": mx_result,
+            "site_metadata": metadata,
+            "email_candidates_unverified": candidates,
+            "enrichment_ready": bool(llm_context),
+            "llm_prompt_payload": (
+                f"Write a 1-sentence observational cold outreach opener for {self.company}. "
+                f"Context: {metadata['title']} - {metadata['description']}"
+            ) if llm_context else None
         }
 
+
+def main():
+    parser = argparse.ArgumentParser(description="ColdEngine OS - Open-Source Lead Intelligence Pre-Filter")
+    parser.add_argument("domain", help="Target company root domain (e.g. vercel.com)")
+    parser.add_argument("--first", default="", help="Lead first name")
+    parser.add_argument("--last", default="", help="Lead last name")
+    parser.add_argument("--company", default="", help="Lead company name (optional)")
+
+    args = parser.parse_args()
+    engine = ColdEngine(domain=args.domain, first_name=args.first, last_name=args.last, company=args.company)
+    print(json.dumps(engine.run(), indent=2))
+
+
 if __name__ == "__main__":
-    test_engine = ColdEngine("stripe.com")
-    print(json.dumps(test_engine.compile_prompt_payload("John", "Doe", "VP Sales"), indent=2))
+    main()
+    
