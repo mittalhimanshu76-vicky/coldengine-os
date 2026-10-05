@@ -11,7 +11,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-VERSION = "1.2.1"
+VERSION = "1.3.0"
 
 
 def sanitize_domain(value):
@@ -107,7 +107,7 @@ class ColdEngine:
 
         request = urllib.request.Request(
             url,
-            headers={"User-Agent": "ColdEngine-OS/1.2.1"},
+            headers={"User-Agent": "ColdEngine-OS/1.3.0"},
         )
 
         try:
@@ -235,6 +235,8 @@ class ColdEngine:
         if not self.domain:
             return {
                 "reachable": False,
+                "status_code": None,
+                "error": "INVALID_DOMAIN",
                 "title": "",
                 "description": "",
                 "is_parked": False,
@@ -243,7 +245,7 @@ class ColdEngine:
         request = urllib.request.Request(
             "https://" + self.domain,
             headers={
-                "User-Agent": "Mozilla/5.0 ColdEngine/1.2.1"
+                "User-Agent": "Mozilla/5.0 ColdEngine/1.3.0"
             },
         )
 
@@ -252,18 +254,36 @@ class ColdEngine:
                 request,
                 timeout=4,
             ) as response:
+                status_code = getattr(
+                    response,
+                    "status",
+                    None,
+                )
+
                 html = response.read()[:65536].decode(
                     "utf-8",
                     errors="ignore",
                 )
 
+        except urllib.error.HTTPError as exc:
+            return {
+                "reachable": False,
+                "status_code": exc.code,
+                "error": f"HTTP_{exc.code}",
+                "title": "",
+                "description": "",
+                "is_parked": False,
+            }
+
         except (
             urllib.error.URLError,
             TimeoutError,
             socket.timeout,
-        ):
+        ) as exc:
             return {
                 "reachable": False,
+                "status_code": None,
+                "error": type(exc).__name__,
                 "title": "",
                 "description": "",
                 "is_parked": False,
@@ -302,32 +322,50 @@ class ColdEngine:
             else ""
         )
 
-        text = (
-            title
-            + " "
-            + description
-            + " "
-            + html
-        ).lower()
+        title_text = title.lower()
+        description_text = description.lower()
+        page_text = html.lower()
 
-        parked_patterns = [
+        strong_parked_patterns = [
             r"domain\s+(is\s+)?for\s+sale",
             r"buy\s+this\s+domain",
+            r"this\s+domain\s+is\s+parked",
             r"parked\s+free",
-            r"godaddy.*domain",
-            r"sedo",
-            r"dan\.com",
-            r"under\s+construction",
             r"renew\s+your\s+domain",
         ]
 
-        parked = any(
-            re.search(pattern, text)
-            for pattern in parked_patterns
+        page_parked_patterns = [
+            r"domain\s+for\s+sale",
+            r"purchase\s+this\s+domain",
+            r"domain\s+name\s+for\s+sale",
+            r"under\s+construction",
+            r"coming\s+soon",
+            r"sedo",
+            r"dan\.com",
+            r"godaddy",
+        ]
+
+        strong_signal = any(
+            re.search(pattern, title_text)
+            or re.search(pattern, description_text)
+            for pattern in strong_parked_patterns
+        )
+
+        page_signal_count = sum(
+            1
+            for pattern in page_parked_patterns
+            if re.search(pattern, page_text)
+        )
+
+        parked = bool(
+            strong_signal
+            or page_signal_count >= 2
         )
 
         return {
             "reachable": True,
+            "status_code": status_code,
+            "error": "",
             "title": title,
             "description": description,
             "is_parked": parked,
@@ -365,10 +403,39 @@ class ColdEngine:
         else:
             metadata = {
                 "reachable": False,
+                "status_code": None,
+                "error": "",
                 "title": "",
                 "description": "",
                 "is_parked": False,
             }
+
+        dns_hard_reject = (
+            mx["status"]
+            in (
+                "INVALID_DOMAIN_FORMAT",
+                "NXDOMAIN",
+                "NO_MX_RECORDS",
+                "NULL_MX_EXPLICIT_REJECT",
+            )
+        )
+
+        parked_hard_reject = bool(
+            mx["has_mx"] is True
+            and metadata["reachable"]
+            and metadata["is_parked"]
+        )
+
+        hard_reject = bool(
+            dns_hard_reject
+            or parked_hard_reject
+        )
+
+        needs_review = bool(
+            not hard_reject
+            and mx["has_mx"] is True
+            and not metadata["reachable"]
+        )
 
         ready = bool(
             mx["has_mx"] is True
@@ -384,6 +451,8 @@ class ColdEngine:
             "site_metadata": metadata,
             "email_candidates_unverified":
                 self.generate_email_candidates(),
+            "hard_reject": hard_reject,
+            "needs_review": needs_review,
             "enrichment_ready": ready,
             "llm_prompt_payload": (
                 f"Write a 1-sentence observational cold "
@@ -463,6 +532,10 @@ def process_bulk_csv(input_path, output_path):
         "coldengine_has_mx",
         "coldengine_retryable",
         "coldengine_is_parked",
+        "coldengine_site_reachable",
+        "coldengine_site_error",
+        "coldengine_hard_reject",
+        "coldengine_needs_review",
         "coldengine_ready",
         "coldengine_candidates",
     ]
@@ -502,6 +575,22 @@ def process_bulk_csv(input_path, output_path):
                 result["site_metadata"]["is_parked"]
             )
 
+            out["coldengine_site_reachable"] = str(
+                result["site_metadata"]["reachable"]
+            )
+
+            out["coldengine_site_error"] = (
+                result["site_metadata"]["error"]
+            )
+
+            out["coldengine_hard_reject"] = str(
+                result["hard_reject"]
+            )
+
+            out["coldengine_needs_review"] = str(
+                result["needs_review"]
+            )
+
             out["coldengine_ready"] = str(
                 result["enrichment_ready"]
             )
@@ -523,6 +612,12 @@ def process_bulk_csv(input_path, output_path):
             out["coldengine_has_mx"] = ""
             out["coldengine_retryable"] = "False"
             out["coldengine_is_parked"] = "False"
+            out["coldengine_site_reachable"] = "False"
+            out["coldengine_site_error"] = (
+                type(exc).__name__
+            )
+            out["coldengine_hard_reject"] = "False"
+            out["coldengine_needs_review"] = "True"
             out["coldengine_ready"] = "False"
             out["coldengine_candidates"] = ""
 
@@ -622,3 +717,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+           
