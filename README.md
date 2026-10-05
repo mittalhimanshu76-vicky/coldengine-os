@@ -30,7 +30,8 @@ No `pip install` required. Built entirely on the Python 3 standard library.
 
 ```bash
 # Clone the repository
-git clone [https://github.com/mittalhimanshu76-vicky/coldengine-os.git](https://github.com/mittalhimanshu76-vicky/coldengine-os.git)
+git clone https://github.com/mittalhimanshu76-vicky/coldengine-os.git
+
 cd coldengine-os
 
 # Run pre-flight check on a domain
