@@ -1,0 +1,202 @@
+{
+  "name": "ColdEngine OS - Waterfall Enrichment",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "1a2b3c4d-0001-4000-8000-000000000001",
+      "name": "When clicking ‘Test workflow’",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  { json: { company: \"Linear\", domain: \"linear.app\" } },\n  { json: { company: \"Vercel\", domain: \"vercel.com\" } },\n  { json: { company: \"Dead Example\", domain: \"nonexistent-domain-coldengine-test.xyz\" } }\n];"
+      },
+      "id": "1a2b3c4d-0002-4000-8000-000000000002",
+      "name": "Sample Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://dns.google/resolve?name={{ $json.domain }}&type=MX",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "1a2b3c4d-0003-4000-8000-000000000003",
+      "name": "Google DoH MX Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-1",
+              "leftValue": "={{ $json.Status }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-2",
+              "leftValue": "={{ Boolean($json.Answer && $json.Answer.length > 0) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "1a2b3c4d-0004-4000-8000-000000000004",
+      "name": "Has Active MX?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "url": "=https://{{ $('Sample Leads').item.json.domain }}",
+        "responseFormat": "string",
+        "options": {
+          "timeout": 4000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": true,
+              "maxRedirects": 3
+            }
+          }
+        }
+      },
+      "id": "1a2b3c4d-0005-4000-8000-000000000005",
+      "name": "Scrape Root HTML",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const html = $json.data || '';\nconst domain = $('Sample Leads').item.json.domain;\nconst company = $('Sample Leads').item.json.company;\n\nconst titleMatch = html.match(/<title[^>]*>([^<]+)<\\/title>/i);\nconst descMatch = html.match(/<meta[^>]*name=[\"']description[\"'][^>]*content=[\"']([^\"']+)[\"']/i) ||\n                  html.match(/<meta[^>]*content=[\"']([^\"']+)[\"'][^>]*name=[\"']description[\"']/i);\n\nconst title = titleMatch ? titleMatch[1].trim() : '';\nconst description = descMatch ? descMatch[1].trim() : '';\n\nconst isParked = /domain for sale|buy this domain|parked free|godaddy/i.test(title + ' ' + description);\n\nreturn {\n  json: {\n    company,\n    domain,\n    title,\n    description,\n    isParked,\n    status: isParked ? 'PARKED_DROPPED' : 'READY_FOR_ENRICHMENT'\n  }\n};"
+      },
+      "id": "1a2b3c4d-0006-4000-8000-000000000006",
+      "name": "Extract Metadata",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_OPENAI_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4o-mini\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are an outbound B2B copywriter. Write a 1-sentence observational opener referencing what this company builds without generic flattery.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Company: {{ $json.company }}\\nDomain: {{ $json.domain }}\\nTitle: {{ $json.title }}\\nDescription: {{ $json.description }}\"\n    }\n  ],\n  \"temperature\": 0.5\n}"
+      },
+      "id": "1a2b3c4d-0007-4000-8000-000000000007",
+      "name": "Generate Opener (gpt-4o-mini)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 200]
+    }
+  ],
+  "connections": {
+    "When clicking ‘Test workflow’": {
+      "main": [
+        [
+          {
+            "node": "Sample Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sample Leads": {
+      "main": [
+        [
+          {
+            "node": "Google DoH MX Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google DoH MX Check": {
+      "main": [
+        [
+          {
+            "node": "Has Active MX?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Active MX?": {
+      "main": [
+        [
+          {
+            "node": "Scrape Root HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scrape Root HTML": {
+      "main": [
+        [
+          {
+            "node": "Extract Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Metadata": {
+      "main": [
+        [
+          {
+            "node": "Generate Opener (gpt-4o-mini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
