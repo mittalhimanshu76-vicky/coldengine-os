@@ -382,8 +382,316 @@ class ColdEngine:
             "is_parked": is_parked,
         }
 
-    def generate_email_candidates(self) -> list:
+        def generate_email_candidates(self) -> list:
         """
         Generate deterministic email patterns.
 
-        These are candidates only and MUST be verified
+        These are candidates only and MUST be verified downstream.
+        """
+
+        if not self.first_name or not self.domain:
+            return []
+
+        fn = self.first_name
+        ln = self.last_name
+        domain = self.domain
+
+        candidates = [
+            f"{fn}@{domain}",
+        ]
+
+        if ln:
+            candidates.extend(
+                [
+                    f"{fn}.{ln}@{domain}",
+                    f"{fn[0]}{ln}@{domain}",
+                    f"{fn}{ln[0]}@{domain}",
+                    f"{ln}.{fn}@{domain}",
+                ]
+            )
+
+        return candidates
+
+    def run(self) -> dict:
+        mx = self.check_mx_records()
+
+        if mx["has_mx"] is True:
+            metadata = self.fetch_homepage_metadata()
+        else:
+            metadata = {
+                "reachable": False,
+                "title": "",
+                "description": "",
+                "is_parked": False,
+            }
+
+        enrichment_ready = bool(
+            mx["has_mx"] is True
+            and metadata["reachable"]
+            and not metadata["is_parked"]
+        )
+
+        return {
+            "version": VERSION,
+            "domain": self.domain,
+            "company": self.company,
+            "dns_preflight": mx,
+            "site_metadata": metadata,
+            "email_candidates_unverified": (
+                self.generate_email_candidates()
+            ),
+            "enrichment_ready": enrichment_ready,
+            "llm_prompt_payload": (
+                f"Write a 1-sentence observational cold outreach "
+                f"opener for {self.company}. "
+                f"Context: {metadata['title']} - "
+                f"{metadata['description']}"
+            )
+            if enrichment_ready
+            else None,
+        }
+
+
+def process_bulk_csv(input_path: str, output_path: str):
+    """Process a CSV file and write structured ColdEngine results."""
+
+    with open(
+        input_path,
+        mode="r",
+        encoding="utf-8-sig",
+        newline="",
+    ) as infile:
+        reader = csv.DictReader(infile)
+        rows = list(reader)
+
+    if not rows:
+        raise ValueError(f"No data found in {input_path}")
+
+    fieldnames = list(rows[0].keys())
+
+    domain_col = next(
+        (
+            col
+            for col in fieldnames
+            if col.lower()
+            in ("domain", "website", "company_domain")
+        ),
+        fieldnames[0],
+    )
+
+    first_col = next(
+        (
+            col
+            for col in fieldnames
+            if col.lower()
+            in ("first_name", "first", "firstname")
+        ),
+        None,
+    )
+
+    last_col = next(
+        (
+            col
+            for col in fieldnames
+            if col.lower()
+            in ("last_name", "last", "lastname")
+        ),
+        None,
+    )
+
+    company_col = next(
+        (
+            col
+            for col in fieldnames
+            if col.lower()
+            in ("company", "company_name")
+        ),
+        None,
+    )
+
+    output_columns = [
+        "coldengine_status",
+        "coldengine_has_mx",
+        "coldengine_retryable",
+        "coldengine_is_parked",
+        "coldengine_ready",
+        "coldengine_candidates",
+    ]
+
+    out_fieldnames = fieldnames + [
+        col for col in output_columns if col not in fieldnames
+    ]
+
+    processed = []
+
+    print(
+        f"ColdEngine {VERSION}: "
+        f"processing {len(rows)} records..."
+    )
+
+    for row_number, row in enumerate(rows, start=2):
+        try:
+            engine = ColdEngine(
+                raw_domain=row.get(domain_col, ""),
+                first_name=(
+                    row.get(first_col, "")
+                    if first_col
+                    else ""
+                ),
+                last_name=(
+                    row.get(last_col, "")
+                    if last_col
+                    else ""
+                ),
+                company=(
+                    row.get(company_col, "")
+                    if company_col
+                    else ""
+                ),
+            )
+
+            result = engine.run()
+
+            output_row = dict(row)
+
+            output_row["coldengine_status"] = (
+                result["dns_preflight"]["status"]
+            )
+            output_row["coldengine_has_mx"] = str(
+                result["dns_preflight"]["has_mx"]
+            )
+            output_row["coldengine_retryable"] = str(
+                result["dns_preflight"]["retryable"]
+            )
+            output_row["coldengine_is_parked"] = str(
+                result["site_metadata"]["is_parked"]
+            )
+            output_row["coldengine_ready"] = str(
+                result["enrichment_ready"]
+            )
+            output_row["coldengine_candidates"] = ";".join(
+                result["email_candidates_unverified"]
+            )
+
+            processed.append(output_row)
+
+        except Exception as exc:
+            output_row = dict(row)
+
+            output_row["coldengine_status"] = (
+                f"ROW_PROCESSING_ERROR: {type(exc).__name__}"
+            )
+            output_row["coldengine_has_mx"] = ""
+            output_row["coldengine_retryable"] = "False"
+            output_row["coldengine_is_parked"] = "False"
+            output_row["coldengine_ready"] = "False"
+            output_row["coldengine_candidates"] = ""
+
+            processed.append(output_row)
+
+            print(
+                f"Warning: row {row_number} failed: "
+                f"{type(exc).__name__}",
+                file=sys.stderr,
+            )
+
+    with open(
+        output_path,
+        mode="w",
+        encoding="utf-8",
+        newline="",
+    ) as outfile:
+        writer = csv.DictWriter(
+            outfile,
+            fieldnames=out_fieldnames,
+        )
+        writer.writeheader()
+        writer.writerows(processed)
+
+    print(
+        f"Done. Wrote {len(processed)} rows "
+        f"to {output_path}"
+    )
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=(
+            "ColdEngine OS - "
+            "B2B Lead Intelligence Pre-Filter"
+        )
+    )
+
+    parser.add_argument(
+        "domain",
+        nargs="?",
+        default=None,
+        help="Target root domain or URL",
+    )
+
+    parser.add_argument(
+        "--first",
+        default="",
+        help="Lead first name",
+    )
+
+    parser.add_argument(
+        "--last",
+        default="",
+        help="Lead last name",
+    )
+
+    parser.add_argument(
+        "--company",
+        default="",
+        help="Lead company name",
+    )
+
+    parser.add_argument(
+        "--csv",
+        default=None,
+        help="Path to input CSV for bulk processing",
+    )
+
+    parser.add_argument(
+        "--out",
+        default="enriched_leads.csv",
+        help="Output CSV path",
+    )
+
+    args = parser.parse_args()
+
+    if args.csv:
+        try:
+            process_bulk_csv(
+                args.csv,
+                args.out,
+            )
+        except (OSError, ValueError) as exc:
+            print(
+                f"Error: {exc}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    elif args.domain:
+        engine = ColdEngine(
+            raw_domain=args.domain,
+            first_name=args.first,
+            last_name=args.last,
+            company=args.company,
+        )
+
+        print(
+            json.dumps(
+                engine.run(),
+                indent=2,
+            )
+        )
+
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
