@@ -1,0 +1,70 @@
+name: ColdEngine Real Domain Benchmark
+
+on:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run ColdEngine on real domains
+        run: |
+          python enricher.py \
+            --csv benchmarks/domains.csv \
+            --out benchmarks/results.csv
+
+      - name: Calculate benchmark metrics
+        run: |
+          python - <<'PY'
+          import csv
+          from collections import Counter
+
+          with open("benchmarks/results.csv", newline="", encoding="utf-8") as f:
+              rows = list(csv.DictReader(f))
+
+          total = len(rows)
+          ready = sum(
+              r.get("coldengine_ready", "").lower() == "true"
+              for r in rows
+          )
+          retryable = sum(
+              r.get("coldengine_retryable", "").lower() == "true"
+              for r in rows
+          )
+          rejected = total - ready
+
+          print("=" * 50)
+          print("COLDENGINE REAL-DOMAIN BENCHMARK")
+          print("=" * 50)
+          print(f"TOTAL DOMAINS:     {total}")
+          print(f"READY:             {ready}")
+          print(f"REJECTED:          {rejected}")
+          print(f"REJECTION RATE:    {rejected / total * 100:.1f}%")
+          print(f"RETRYABLE:         {retryable}")
+          print()
+          print("STATUS BREAKDOWN:")
+          
+          for status, count in Counter(
+              r.get("coldengine_status", "")
+              for r in rows
+          ).most_common():
+              print(f"  {status}: {count}")
+
+          print("=" * 50)
+          PY
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: coldengine-real-domain-benchmark
+          path: benchmarks/results.csv
