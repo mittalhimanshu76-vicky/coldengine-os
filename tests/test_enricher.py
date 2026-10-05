@@ -509,7 +509,7 @@ class TestRun(unittest.TestCase):
 
         self.assertEqual(
             result["version"],
-            "1.2.1",
+            "1.3.0",
         )
 
     def test_run_does_not_fetch_homepage_without_mx(self):
